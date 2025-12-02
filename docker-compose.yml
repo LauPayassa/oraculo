@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_DB: oraculo_db
+      POSTGRES_USER: oraculo
+      POSTGRES_PASSWORD: oraculo_password
+    volumes:
+      - oraculo-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    command: npm run start
+    environment:
+      PORT: 3000
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: oraculo
+      DATABASE_PASSWORD: oraculo_password
+      DATABASE_NAME: oraculo_db
+      JWT_SECRET: change_this_secret
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+
+volumes:
+  oraculo-db-data:
