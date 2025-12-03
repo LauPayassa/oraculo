@@ -39,6 +39,73 @@ export class ReadingsService {
     return { reading, interpretations };
   }
 
+  async saveReading(userId: string | null, type: string, cards: any[], spreadType: number) {
+    const reading = this.readingRepo.create({
+      user: userId ? ({ id: userId } as any) : null,
+      type: type || 'custom',
+      cards: JSON.stringify(cards),
+      meta: JSON.stringify({ spreadType }),
+      isPrivate: false
+    });
+    const saved = await this.readingRepo.save(reading);
+    
+    // Retornar com as cartas populadas
+    const cardIds = cards.map(c => c.id);
+    const fullCards = await this.cardRepo.findByIds(cardIds);
+    
+    return {
+      ...saved,
+      cardsData: fullCards
+    };
+  }
+
+  async getPublicHistory(limit = 20) {
+    const readings = await this.readingRepo.find({
+      where: { isPrivate: false },
+      order: { createdAt: 'DESC' },
+      take: limit
+    });
+
+    // Popular com dados das cartas
+    const enriched = await Promise.all(
+      readings.map(async (reading) => {
+        const cardData = JSON.parse(reading.cards);
+        const cardIds = cardData.map((c: any) => c.id);
+        const cards = await this.cardRepo.findByIds(cardIds);
+        const meta = reading.meta ? JSON.parse(reading.meta) : {};
+        
+        return {
+          id: reading.id,
+          type: reading.type,
+          createdAt: reading.createdAt,
+          spreadType: meta.spreadType || cardData.length,
+          cards: cards,
+          cardCount: cards.length
+        };
+      })
+    );
+
+    return enriched;
+  }
+
+  async getReadingById(id: string) {
+    const reading = await this.readingRepo.findOne({ where: { id } });
+    if (!reading) return null;
+
+    const cardData = JSON.parse(reading.cards);
+    const cardIds = cardData.map((c: any) => c.id);
+    const cards = await this.cardRepo.findByIds(cardIds);
+    const meta = reading.meta ? JSON.parse(reading.meta) : {};
+
+    return {
+      id: reading.id,
+      type: reading.type,
+      createdAt: reading.createdAt,
+      spreadType: meta.spreadType || cardData.length,
+      cards: cards
+    };
+  }
+
   async historyForUser(userId: string, limit = 20) {
     return this.readingRepo.find({ where: { user: { id: userId } }, order: { createdAt: 'DESC' }, take: limit });
   }
